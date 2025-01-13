@@ -12,7 +12,7 @@ export const tweetTemplate = `
 {{recentPostInteractions}}
 
 # Task
-Generate a tweet that dpn't include links or quote id from the context:
+Generate a tweet that doesn't include links or quote id from the context:
 1. Relates to the recent conversation or requested topic.
 2. Matches the character's style and voice
 3. Is concise and engaging
