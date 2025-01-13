@@ -12,11 +12,22 @@ export const tweetTemplate = `
 {{recentPostInteractions}}
 
 # Task
-Generate a tweet that:
-1. Relates to the recent conversation or requested topic
+Generate a tweet that dpn't include links or quote id from the context:
+1. Relates to the recent conversation or requested topic.
 2. Matches the character's style and voice
 3. Is concise and engaging
 4. Must be UNDER 180 characters (this is a strict requirement)
 5. Speaks from the perspective of {{agentName}}
+6. Extract quote ID from the context. (e.g. 'Quote: 1881240124856')
+7. Extract url link from the context. (e.g. 'Link: https://www.example.com')
 
-Generate only the tweet text, no other commentary.`;
+
+Generate a json response, no other commentary.
+
+Json format:
+{
+  "text": "Tweet content here",
+  "quoteID": "quoteId as string here",
+  "link": "link url here"
+}
+`;

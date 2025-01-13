@@ -11,7 +11,7 @@ import {
 } from "@elizaos/core";
 import { Scraper } from "agent-twitter-client";
 import { tweetTemplate } from "../templates";
-import { isTweetContent, TweetSchema } from "../types";
+import { isTweetContent, TweetSchema, TweetContent } from "../types";
 
 export const DEFAULT_MAX_TWEET_LENGTH = 280;
 
@@ -19,7 +19,7 @@ async function composeTweet(
     runtime: IAgentRuntime,
     _message: Memory,
     state?: State
-): Promise<string> {
+): Promise<TweetContent> {
     try {
         const context = composeContext({
             state,
@@ -42,26 +42,32 @@ async function composeTweet(
             return;
         }
 
-        let trimmedContent = tweetContentObject.object.text.trim();
+        tweetContentObject.object.text = tweetContentObject.object.text.trim();
 
         // Truncate the content to the maximum tweet length specified in the environment settings.
         const maxTweetLength = runtime.getSetting("MAX_TWEET_LENGTH");
         if (maxTweetLength) {
-            trimmedContent = truncateToCompleteSentence(
-                trimmedContent,
+            tweetContentObject.object.text = truncateToCompleteSentence(
+                tweetContentObject.object.text,
                 Number(maxTweetLength)
             );
         }
 
-        return trimmedContent;
+        return tweetContentObject.object;
     } catch (error) {
         elizaLogger.error("Error composing tweet:", error);
         throw error;
     }
 }
 
-async function sendTweet(twitterClient: Scraper, content: string) {
-    const result = await twitterClient.sendTweet(content);
+async function sendTweet(
+    twitterClient: Scraper,
+    content: string,
+    quoteId?: string
+): Promise<boolean> {
+    const result = quoteId
+        ? await twitterClient.sendQuoteTweet(content, quoteId)
+        : await twitterClient.sendTweet(content);
 
     const body = await result.json();
     elizaLogger.log("Tweet response:", body);
@@ -86,7 +92,7 @@ async function sendTweet(twitterClient: Scraper, content: string) {
 
 async function postTweet(
     runtime: IAgentRuntime,
-    content: string
+    content: TweetContent
 ): Promise<boolean> {
     try {
         const twitterClient = runtime.clients.twitter?.client?.twitterClient;
@@ -115,20 +121,25 @@ async function postTweet(
         // Send the tweet
         elizaLogger.log("Attempting to send tweet:", content);
 
+        let tweetText = content.text;
+        if (content.link) {
+            tweetText += ` ${content.link}`;
+        }
+
         try {
-            if (content.length > DEFAULT_MAX_TWEET_LENGTH) {
+            if (tweetText.length > DEFAULT_MAX_TWEET_LENGTH) {
                 const noteTweetResult = await scraper.sendNoteTweet(content);
                 if (
                     noteTweetResult.errors &&
                     noteTweetResult.errors.length > 0
                 ) {
                     // Note Tweet failed due to authorization. Falling back to standard Tweet.
-                    return await sendTweet(scraper, content);
+                    return await sendTweet(scraper, tweetText, content.quoteID);
                 } else {
                     return true;
                 }
             } else {
-                return await sendTweet(scraper, content);
+                return await sendTweet(scraper, tweetText, content.quoteID);
             }
         } catch (error) {
             throw new Error(`Note Tweet failed: ${error}`);
@@ -170,13 +181,14 @@ export const postAction: Action = {
         try {
             // Generate tweet content using context
             const tweetContent = await composeTweet(runtime, message, state);
-
             if (!tweetContent) {
                 elizaLogger.error("No content generated for tweet");
                 return false;
             }
 
-            elizaLogger.log(`Generated tweet content: ${tweetContent}`);
+            elizaLogger.log(
+                `Generated tweet content: ${JSON.stringify(tweetContent)}`
+            );
 
             // Check for dry run mode - explicitly check for string "true"
             if (
@@ -184,7 +196,7 @@ export const postAction: Action = {
                 process.env.TWITTER_DRY_RUN.toLowerCase() === "true"
             ) {
                 elizaLogger.info(
-                    `Dry run: would have posted tweet: ${tweetContent}`
+                    `Dry run: would have posted tweet: ${JSON.stringify(tweetContent)}`
                 );
                 return true;
             }
