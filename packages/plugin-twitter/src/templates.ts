@@ -20,7 +20,7 @@ Generate a tweet that doesn't include links or quote id from the context:
 5. Speaks from the perspective of {{agentName}}
 6. Extract quote ID from the context. (e.g. 'Quote: 1881240124856')
 7. Extract url link from the context. (e.g. 'Link: https://www.example.com')
-
+8. Keep the dollar sign ($) in front of token symbols (e.g. $BTC, $ETH)
 
 Generate a json response, no other commentary.
 
